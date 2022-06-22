@@ -1,0 +1,57 @@
+name: Push Docker Image to GAR Repository
+description: 'Push a Docker image to a GAR Repository'
+author: Jordan Bigelow
+branding:
+  icon: anchor
+  color: blue
+
+inputs:
+  DOCKER_IMAGE_NAME:
+    description: 'Name of Image to Push to GAR'
+    required: true
+  GCP_CREDENTIALS:
+    description: 'Service Account Credentials in JSON format that have been Base64 Encoded'
+    required: true
+  GCP_PROJECT_ID:
+    description: 'ID of Project that the GCS bucket is associated with'
+    required: true
+  GCP_REPO_NAME:
+    description: 'Name of Artifact Registry in GCP'
+    required: true
+  GCP_REGION:
+    description: 'Name of GCP Region that Artifact Registry is Located'
+    required: false
+    default: 'us-west3'
+
+runs:
+  using: composite
+
+  steps:
+    - id: auth
+      uses: google-github-actions/auth@v0
+      with:
+        credentials_json: ${{ inputs.GCP_CREDENTIALS }}
+        token_format: 'access_token'
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v0
+      with:
+        project_id: ${{ inputs.GCP_PROJECT_ID }}
+        export_default_credentials: true
+
+    - name: Login To GCR
+      uses: docker/login-action@v2
+      with:
+        registry: ${{ inputs.GCP_REGION }}"-docker.pkg.dev"
+        username: oauth2accesstoken
+        password: ${{ steps.auth.outputs.access_token }}
+
+    - name: Publish Docker Image
+      shell: bash
+      run: |
+        IMAGE_NAME=${{ inputs.DOCKER_IMAGE_NAME }}
+        REGISTRY_HOSTNAME=${{ inputs.GCP_REGION }}"-docker.pkg.dev"
+        REPO_NAME=${{ inputs.GCP_REPO_NAME }}
+        PROJECT=${{ inputs.GCP_PROJECT_ID }}
+        docker tag ${{ inputs.DOCKER_IMAGE_NAME }} "$REGISTRY_HOSTNAME"/"$PROJECT"/"$REPO_NAME"/"$IMAGE_NAME"
+        docker push ${{ inputs.DOCKER_IMAGE_NAME }} "$REGISTRY_HOSTNAME"/"$PROJECT"/"$REPO_NAME"/"$IMAGE_NAME"
